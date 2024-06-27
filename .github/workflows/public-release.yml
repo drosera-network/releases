@@ -34,10 +34,8 @@ jobs:
           echo "$response" > release_info.json
           
           # Extract release information
-          release_name=$(echo "$response" | jq -r '.name')
           body=$(echo "$response" | jq -r '.body')
 
-          echo "::set-output name=release_name::$release_name"
           echo "::set-output name=body::$body"
 
           # Extract assets URLs
@@ -54,9 +52,11 @@ jobs:
       - name: Create release in current repository
         id: create_release
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEVOPS_GITHUB_TOKEN }}
         with:
           tag_name: ${{ inputs.release_tag }}
-          release_name: ${{ steps.fetch_release.outputs.release_name }}
+          release_name: ${{ inputs.release_tag }}
           body: ${{ steps.fetch_release.outputs.body }}
           draft: false
           prerelease: true
