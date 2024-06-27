@@ -35,7 +35,7 @@ jobs:
           # Extract release information
           body=$(echo "$response" | jq -r '.body')
 
-          echo "body=$body" >> $GITHUB_OUTPUT
+          echo "${body}" >> body.md
 
           # Extract assets URLs
           assets_urls=$(echo "$response" | jq -r '.assets[].browser_download_url')
@@ -52,7 +52,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          body: ${{ steps.fetch_release.outputs.body }}
+          body_path: body.md
           prerelease: true
           files: ./assets/*.gz
           tag_name: ${{ inputs.release_tag }}
