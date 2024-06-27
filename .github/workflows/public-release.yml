@@ -55,6 +55,7 @@ jobs:
           prerelease: true
           files: ./assets/*.gz
           tag_name: ${{ inputs.release_tag }}
+          token: ${{ secrets.DEVOPS_GITHUB_TOKEN }}
           # make_latest: true
 
 
