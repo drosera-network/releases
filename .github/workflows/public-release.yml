@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Fetch release information from source repository
         id: fetch_release
@@ -31,12 +31,11 @@ jobs:
                           -H "Authorization: Bearer ${GITHUB_TOKEN}" \
                           -H "X-GitHub-Api-Version: 2022-11-28" \
                           "https://api.github.com/repos/${SOURCE_REPO}/releases/tags/${RELEASE_TAG}")
-          echo "$response" > release_info.json
           
           # Extract release information
           body=$(echo "$response" | jq -r '.body')
 
-          echo "::set-output name=body::$body"
+          echo "body=$body" >> $GITHUB_OUTPUT
 
           # Extract assets URLs
           assets_urls=$(echo "$response" | jq -r '.assets[].browser_download_url')
@@ -49,24 +48,32 @@ jobs:
             curl -L -o assets/$(basename "$url") "$url"
           done < assets_urls.txt
 
-      - name: Create release in current repository
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.DEVOPS_GITHUB_TOKEN }}
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          tag_name: ${{ inputs.release_tag }}
-          release_name: ${{ inputs.release_tag }}
           body: ${{ steps.fetch_release.outputs.body }}
-          draft: false
           prerelease: true
-          token: ${{ secrets.DEVOPS_GITHUB_TOKEN }}
+          files: ./assets/*.gz
+          tag_name: ${{ inputs.release_tag }}
+          # make_latest: true
 
-      - name: Upload assets to the release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.DEVOPS_GITHUB_TOKEN }}
-          file: ./assets/*.gz
-          tag: ${{ inputs.release_tag }}
-          overwrite: true
-          file_glob: true
+
+      # - name: Create release in current repository
+      #   id: create_release
+      #   uses: actions/create-release@v1
+      #   with:
+      #     tag_name: ${{ inputs.release_tag }}
+      #     release_name: ${{ inputs.release_tag }}
+      #     body: ${{ steps.fetch_release.outputs.body }}
+      #     draft: false
+      #     prerelease: true
+
+      # - name: Upload assets to the release
+      #   uses: svenstaro/upload-release-action@v2
+      #   with:
+      #     repo_token: ${{ secrets.DEVOPS_GITHUB_TOKEN }}
+      #     file: ./assets/*.gz
+      #     tag: ${{ inputs.release_tag }}
+      #     overwrite: true
+      #     file_glob: true
