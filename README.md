@@ -34,6 +34,12 @@ This guide provides steps to download and install our released binaries from the
     ```sh
     mv operator /usr/bin/
     ```
+## Install droseraup installer for drosera
+Note:  Windows users must use WSL or Git-Bash to utilize the droseraup utility.
+
+```bash
+curl https://raw.githubusercontent.com/drosera-network/releases/main/droseraup/install | bash
+```
 
 ### Docs
 - Checkout our [Official Docs](https://dev.drosera.io) for configuring and running these binaries on your system.

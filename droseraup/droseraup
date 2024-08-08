@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+BASE_DIR=${XDG_CONFIG_HOME:-$HOME}
+DROSERA_DIR=${DROSERA_DIR:-"$BASE_DIR/.drosera"}
+DROSERA_BIN_DIR="$DROSERA_DIR/bin"
+
+f_usage() {
+  cat 1>&2 <<EOF
+ _____     ______     ______     ______     ______     ______     ______     __  __     ______  
+/\  __-.  /\  == \   /\  __ \   /\  ___\   /\  ___\   /\  == \   /\  __ \   /\ \ \ \   /\  == \ 
+\ \ \/\ \ \ \  __<   \ \ \/\ \  \ \___  \  \ \  __\   \ \  __<   \ \  __ \  \ \ \_\ \  \ \  __/ 
+ \ \____-  \ \_\ \_\  \ \_____\  \/\_____\  \ \_____\  \ \_\ \_\  \ \_\ \_\  \ \____-   \ \_\   
+  \/____/   \/_/ /_/   \/_____/   \/_____/   \/_____/   \/_/ /_/   \/_/\/_/   \/____/    \/_/   
+
+The installer for Drosera.
+
+Update to latest Drosera cli version or choose the version specific to your needs.
+
+By default, the latest released version is installed from the released binaries.
+
+USAGE:
+    droseraup <OPTIONS>
+
+OPTIONS:
+    -h      Print help/usage information
+    -v      Install a specific version from built binaries
+    -a      Install for a specific architecture (supports aarch64 and x86_64)
+    -p      Install for a specific platform (supports windows, linux, and darwin)
+EOF
+}
+
+f_logMessage() {
+    printf "droseraup log: %s\n" "$1"
+}
+
+f_warn() {
+    f_logMessage "warning: ${1}" >&2
+}
+
+f_error() {
+    f_logMessage "$1" >&2
+    f_usage
+    exit 1
+}
+
+f_toLower() {
+    local _str
+    _str="${1}"
+    echo "${_str}" |awk '{print tolower($1)}'
+}
+
+f_needCmd() {
+    if ! check_cmd "$1"; then
+        f_error "need '$1' (command not found)"
+    fi
+}
+
+f_checkCmd() {
+    command -v "$1" &>/dev/null
+}
+
+f_ensure() {
+    if ! "$@"; then 
+        f_error "command failed: $*";
+    fi
+}
+
+f_download() {
+    if [ -n "$2" ]; then
+        # output into $2
+        if f_checkCmd curl; then
+            curl -o "$2" -#L "$1"
+        else
+            wget --show-progress -qO "$2" "$1"
+        fi
+    fi
+}
+
+f_getLatest() {
+    local _latest_version
+    _latest_version=$(curl -L \
+                        -H "Accept: application/vnd.github+json" \
+                        -H "X-GitHub-Api-Version: 2022-11-28" \
+                        https://api.github.com/repos/drosera-network/releases/releases/latest \
+                        | grep "tag_name" \
+                        | awk '{gsub(/[",]/, ""); print $2}')
+    echo "$_latest_version"
+}
+
+f_getLatest
+
+##### BEGIN MAIN ######
+
+while getopts "hv:a:p:" o; do
+    case "${o}" in
+        h) f_usage;;
+        v) DROSERA_VERSION=${OPTARG};;
+        a) DROSERA_ARCH=${OPTARG};;
+        p) DROSERA_PLAT=${OPTARG};;
+        \?)
+            echo "Invalid option: -$OPTARG"
+            ;;
+    esac
+done
+
+f_logMessage "Beginning Update/Installation"
+
+ARCHITECTURE=$(f_toLower "${DROSERA_ARCH:-$(uname -m)}")
+if [ "${ARCHITECTURE}" = "x86_64" ]; then
+    if [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = "1" ]; then
+        ARCHITECTURE="aarch64"
+        f_logMessage "Set architecture to ${ARCHITECTURE}"
+    else
+        ARCHITECTURE="x86_64"
+        f_logMessage "Set architecture to ${ARCHITECTURE}"
+    fi
+elif [ "${ARCHITECTURE}" = "arm64" ] ||[ "${ARCHITECTURE}" = "aarch64" ] ; then
+    ARCHITECTURE="aarch64"
+    f_logMessage "Set architecture to ${ARCHITECTURE}"
+else
+    ARCHITECTURE="x86_64"
+    f_logMessage "Set architecture to ${ARCHITECTURE}"
+fi
+
+PLATFORM=$(f_toLower "${DROSERA_PLAT:-$(uname -s)}")
+case $PLATFORM in
+    linux)
+        PLATFORM="unknown-linux-gnu"
+        f_logMessage "Set platform to ${PLATFORM}"
+        ;;
+    darwin|mac*)
+        PLATFORM="apple-darwin"
+        f_logMessage "Set platform to ${PLATFORM}"
+        ;;
+    mingw*|win*)
+        PLATFORM="pc-windows-msvc"
+        f_logMessage "Set platform to ${PLATFORM}"
+        ;;
+    *)
+        f_logMessage "Set platform to ${PLATFORM}"
+        f_error "error: unsupported platform: $PLATFORM"
+        ;;
+esac
+
+VERSION=$(f_toLower "${DROSERA_VERSION:-$(f_getLatest)}")
+
+if [ ! -d "${DROSERA_DIR}" ]; then
+    f_logMessage "Creating directory: ${DROSERA_DIR}"
+    mkdir "${DROSERA_DIR}" || f_logMessage "Unable to create directory"
+else
+    f_logMessage "${DROSERA_DIR} already exists"
+fi
+
+if [ ! -d "${DROSERA_BIN_DIR}" ]; then
+    f_logMessage "Creating directory: ${DROSERA_BIN_DIR}"
+    mkdir "${DROSERA_BIN_DIR}" || f_logMessage "Unable to create directory"
+else
+    f_logMessage "${DROSERA_BIN_DIR} already exists"
+fi
+
+f_logMessage "Downloading ${VERSION} version of drosera"
+
+DL_EXT=tar.gz
+DL_FILENAME="drosera-${VERSION}-${ARCHITECTURE}-${PLATFORM}.${DL_EXT}"
+DL_RELEASE_URL="https://github.com/drosera-network/releases/releases/download/${VERSION}"
+DL_ARCHIVE_URL="${DL_RELEASE_URL}/${DL_FILENAME}"
+
+f_download "${DL_ARCHIVE_URL}" "/tmp/${DL_FILENAME}"
+tar xzvf "/tmp/${DL_FILENAME}" -C "${DROSERA_BIN_DIR}"
