@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+echo "Installing droseraup..."
+
+BASE_DIR=${XDG_CONFIG_HOME:-$HOME}
+DROSERA_DIR=${DROSERA_DIR:-"${BASE_DIR}/.drosera"}
+DROSERA_BIN_DIR="${DROSERA_DIR}/bin"
+
+EXEC_URL="https://raw.githubusercontent.com/drosera-network/releases/main/droseraup/droseraup"
+EXEC_PATH="${DROSERA_BIN_DIR}/droseraup"
+
+mkdir -p "${DROSERA_BIN_DIR}"
+curl -sSf -L "${EXEC_URL}" -o "${EXEC_PATH}"
+chmod +x "${EXEC_PATH}"
+
+case $SHELL in
+*/zsh)
+    PROFILE="${ZDOTDIR-"$HOME"}/.zshenv"
+    PREF_SHELL=zsh
+    ;;
+*/bash)
+    PROFILE=$HOME/.bashrc
+    PREF_SHELL=bash
+    ;;
+*/fish)
+    PROFILE=$HOME/.config/fish/config.fish
+    PREF_SHELL=fish
+    ;;
+*/ash)
+    PROFILE=$HOME/.profile
+    PREF_SHELL=ash
+    ;;
+*)
+    echo "Unsupported shell: $SHELL Please add ${DROSERA_BIN_DIR} to your PATH."
+    exit 1
+esac
+
+# Check if $PATH contains DROSERA_BIN_DIR
+if [[ ":$PATH:" != *":${DROSERA_BIN_DIR}:"* ]]; then
+    if [[ "$PREF_SHELL" == "fish" ]]; then
+        echo >> "$PROFILE" && echo "fish_add_path -a $DROSERA_BIN_DIR" >> "$PROFILE"
+    else
+        echo >> "$PROFILE" && echo "export PATH=\"\$PATH:$DROSERA_BIN_DIR\"" >> "$PROFILE"
+    fi
+fi
+
+echo "Detected your preferred shell is $PREF_SHELL and added droseraup to PATH."
+echo "Run 'source $PROFILE' or start a new terminal session to use droseraup."
+echo "Then, simply run 'droseraup' to install Drosera."
